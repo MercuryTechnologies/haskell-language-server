@@ -7,7 +7,7 @@ let
     #  = "sha256-kekOlTlu45vuK2L9nq8iVN17V3sB0WWPqTTW3a2SQG0=";
   };
 
-  inputs = with pkgs.haskell.packages.mwb.ghc922; {
+  inputs = with pkgs.haskell.packages.ghc924; {
     ptr-poker = ptr-poker;
     ghc-exactprint-150 = builtins.fetchTarball "https://hackage.haskell.org/package/ghc-exactprint-1.5.0/ghc-exactprint-1.5.0.tar.gz";
     hlint = hlint;
@@ -94,9 +94,9 @@ let
         (haskell.lib.packageSourceOverrides hlsSources) tweaks hself
         hsuper));
 
-  hlsHpkgs = extended pkgs.haskell.packages.mwb.ghc922;
+  hlsHpkgs = extended pkgs.haskell.packages.ghc924;
 
-  ghc922Config = (import ./configuration-ghc-92.nix) { inherit pkgs inputs; };
+  ghc924Config = (import ./configuration-ghc-92.nix) { inherit pkgs inputs; };
 
   mkExe = hpkgs:
     with pkgs.haskell.lib;
@@ -115,13 +115,13 @@ let
   supportedGHCs = let
     ghcVersion = "ghc" + (pkgs.lib.replaceStrings ["."] [""] pkgs.haskellPackages.ghc.version);
     cases = {
-      ghc922 = ghc922Config.tweakHpkgs hlsHpkgs;
+      ghc924 = ghc924Config.tweakHpkgs hlsHpkgs;
     };
     in { default = cases."${ghcVersion}"; } // cases;
 
 
-  ghc922 = supportedGHCs.ghc922;
+  ghc924 = supportedGHCs.ghc924;
 
 in {
-  haskell-language-server = mkExe ghc922;
+  haskell-language-server = mkExe ghc924;
 }
