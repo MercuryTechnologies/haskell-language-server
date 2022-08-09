@@ -104,8 +104,10 @@
   };
   outputs =
     inputs@{ self, nixpkgs, flake-compat, flake-utils, gitignore, all-cabal-hashes-unpacked, ... }:
-    {
-      overlays.default = final: prev:
+    let # In order to define overlays where the sources use gitignore, and also
+        # where they don't, the overlay is abstracted over a source modifier
+        # which takes the final and prev attrsets and a source directory.
+        mkOverlay = srcModifier: final: prev:
         with prev;
         let
           haskellOverrides = hself: hsuper: {
@@ -129,7 +131,6 @@
                 doHaddock = false;
               });
           };
-          gitignoreSource = (import gitignore { inherit lib; }).gitignoreSource;
 
           # List all subdirectories under `./plugins`, except `./plugins/default`
           pluginsDir = ./plugins;
@@ -173,7 +174,7 @@
             };
 
           hlsSources =
-            builtins.mapAttrs (_: dir: gitignoreSource dir) sourceDirs;
+            builtins.mapAttrs (_: dir: srcModifier final prev dir) sourceDirs;
 
           extended = hpkgs:
             (hpkgs.override (old: {
@@ -216,6 +217,9 @@
               chmod +x $dest
             '';
         };
+    in
+    { overlays.default = mkOverlay (_final: prev: (import gitignore { inherit (prev) lib; }).gitignoreSource);
+      overlays.noGitignore = mkOverlay (_final: _prev: x: x);
     } // (flake-utils.lib.eachSystem [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" ])
     (system:
       let
