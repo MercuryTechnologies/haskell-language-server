@@ -13,7 +13,7 @@ description:
     A library for building Haskell IDE's on top of the GHC API.
 homepage:           https://github.com/haskell/haskell-language-server/tree/master/ghcide#readme
 bug-reports:        https://github.com/haskell/haskell-language-server/issues
-tested-with:        GHC == 8.6.5 || == 8.8.4 || == 8.10.7 || == 9.0.2 || == 9.2.2 || == 9.2.3
+tested-with:        GHC == 8.6.5 || == 8.8.4 || == 8.10.7 || == 9.0.2 || == 9.2.3 || == 9.2.4
 extra-source-files: README.md CHANGELOG.md
                     test/data/**/*.project
                     test/data/**/*.cabal
@@ -46,6 +46,7 @@ library
         binary,
         bytestring,
         case-insensitive,
+        co-log-core,
         containers,
         data-default,
         deepseq,
@@ -59,7 +60,7 @@ library
         filepath,
         fingertree,
         focus,
-        ghc-exactprint,
+        ghc-exactprint < 1 || >= 1.4,
         ghc-trace-events,
         Glob,
         haddock-library >= 1.8 && < 1.11,
@@ -69,8 +70,8 @@ library
         lens,
         list-t,
         hiedb == 0.4.1.*,
-        lsp-types ^>= 1.4.0.1,
-        lsp ^>= 1.4.0.0 ,
+        lsp-types ^>= 1.5.0.0,
+        lsp ^>= 1.5.0.0 ,
         monoid-subclasses,
         mtl,
         network-uri,
@@ -81,7 +82,7 @@ library
         random,
         regex-tdfa >= 1.3.1.0,
         retrie,
-        rope-utf16-splay,
+        text-rope,
         safe,
         safe-exceptions,
         hls-graph ^>= 1.7,
@@ -102,12 +103,12 @@ library
         vector,
         opentelemetry >=0.6.1,
         heapsize ==0.3.*,
-        unliftio,
+        unliftio >= 0.2.6,
         unliftio-core,
         ghc-boot-th,
         ghc-boot,
         ghc >= 8.6,
-        ghc-check >=0.5.0.4,
+        ghc-check >=0.5.0.8,
         ghc-paths,
         cryptohash-sha1 >=0.11.100 && <0.12,
         hie-bios ^>= 0.9.1,
@@ -191,6 +192,7 @@ library
         Development.IDE.Monitoring.EKG
         Development.IDE.LSP.HoverDefinition
         Development.IDE.LSP.LanguageServer
+        Development.IDE.LSP.Notifications
         Development.IDE.LSP.Outline
         Development.IDE.LSP.Server
         Development.IDE.Session
@@ -224,7 +226,6 @@ library
         Development.IDE.Core.FileExists
         Development.IDE.GHC.CPP
         Development.IDE.GHC.Warnings
-        Development.IDE.LSP.Notifications
         Development.IDE.Plugin.CodeAction.PositionIndexed
         Development.IDE.Plugin.CodeAction.Args
         Development.IDE.Plugin.Completions.Logic
@@ -421,7 +422,6 @@ test-suite ghcide-tests
         QuickCheck,
         quickcheck-instances,
         random,
-        rope-utf16-splay,
         regex-tdfa ^>= 1.3.1,
         safe,
         safe-exceptions,
@@ -432,10 +432,11 @@ test-suite ghcide-tests
         hls-graph,
         tasty,
         tasty-expected-failure,
-        tasty-hunit,
+        tasty-hunit >= 0.10,
         tasty-quickcheck,
         tasty-rerun,
         text,
+        text-rope,
         unordered-containers,
         vector,
     if (impl(ghc >= 8.6) && impl(ghc < 9.2))
@@ -497,7 +498,7 @@ executable ghcide-bench
         safe-exceptions,
         hls-graph,
         shake,
-        tasty-hunit,
+        tasty-hunit >= 0.10,
         text
     hs-source-dirs: bench/lib bench/exe test/src
     ghc-options: -threaded -Wall -Wno-name-shadowing -rtsopts

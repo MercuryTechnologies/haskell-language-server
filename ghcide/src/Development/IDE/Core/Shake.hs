@@ -99,6 +99,7 @@ import           Data.EnumMap.Strict                    (EnumMap)
 import qualified Data.EnumMap.Strict                    as EM
 import           Data.Foldable                          (for_, toList)
 import           Data.Functor                           ((<&>))
+import           Data.Functor.Identity
 import           Data.Hashable
 import qualified Data.HashMap.Strict                    as HMap
 import           Data.HashSet                           (HashSet)
@@ -163,7 +164,7 @@ import qualified Language.LSP.Server                    as LSP
 import           Language.LSP.Types
 import qualified Language.LSP.Types                     as LSP
 import           Language.LSP.Types.Capabilities
-import           Language.LSP.VFS
+import           Language.LSP.VFS                       hiding (start)
 import qualified "list-t" ListT
 import           OpenTelemetry.Eventlog
 import qualified StmContainers.Map                      as STM
@@ -322,7 +323,7 @@ class Typeable a => IsIdeGlobal a where
 -- | Read a virtual file from the current snapshot
 getVirtualFile :: NormalizedFilePath -> Action (Maybe VirtualFile)
 getVirtualFile nf = do
-  vfs <- fmap vfsMap . liftIO . readTVarIO . vfsVar =<< getShakeExtras
+  vfs <- fmap _vfsMap . liftIO . readTVarIO . vfsVar =<< getShakeExtras
   pure $! Map.lookup (filePathToUri' nf) vfs -- Don't leak a reference to the entire map
 
 -- Take a snapshot of the current LSP VFS
@@ -705,6 +706,7 @@ shakeRestart recorder IdeState{..} vfs reason acts =
               backlog <- readTVarIO $ dirtyKeys shakeExtras
               queue <- atomicallyNamed "actionQueue - peek" $ peekInProgress $ actionQueue shakeExtras
 
+              -- this log is required by tests
               log Debug $ LogBuildSessionRestart reason queue backlog stopTime res
         )
         -- It is crucial to be masked here, otherwise we can get killed
@@ -920,21 +922,21 @@ defineNoDiagnostics recorder op = defineEarlyCutoff recorder $ RuleNoDiagnostics
 -- | Request a Rule result if available
 use :: IdeRule k v
     => k -> NormalizedFilePath -> Action (Maybe v)
-use key file = head <$> uses key [file]
+use key file = runIdentity <$> uses key (Identity file)
 
 -- | Request a Rule result, it not available return the last computed result, if any, which may be stale
 useWithStale :: IdeRule k v
     => k -> NormalizedFilePath -> Action (Maybe (v, PositionMapping))
-useWithStale key file = head <$> usesWithStale key [file]
+useWithStale key file = runIdentity <$> usesWithStale key (Identity file)
 
 -- | Request a Rule result, it not available return the last computed result which may be stale.
 --   Errors out if none available.
 useWithStale_ :: IdeRule k v
     => k -> NormalizedFilePath -> Action (v, PositionMapping)
-useWithStale_ key file = head <$> usesWithStale_ key [file]
+useWithStale_ key file = runIdentity <$> usesWithStale_ key (Identity file)
 
 -- | Plural version of 'useWithStale_'
-usesWithStale_ :: IdeRule k v => k -> [NormalizedFilePath] -> Action [(v, PositionMapping)]
+usesWithStale_ :: (Traversable f, IdeRule k v) => k -> f NormalizedFilePath -> Action (f (v, PositionMapping))
 usesWithStale_ key files = do
     res <- usesWithStale key files
     case sequence res of
@@ -999,12 +1001,12 @@ useNoFile :: IdeRule k v => k -> Action (Maybe v)
 useNoFile key = use key emptyFilePath
 
 use_ :: IdeRule k v => k -> NormalizedFilePath -> Action v
-use_ key file = head <$> uses_ key [file]
+use_ key file = runIdentity <$> uses_ key (Identity file)
 
 useNoFile_ :: IdeRule k v => k -> Action v
 useNoFile_ key = use_ key emptyFilePath
 
-uses_ :: IdeRule k v => k -> [NormalizedFilePath] -> Action [v]
+uses_ :: (Traversable f, IdeRule k v) => k -> f NormalizedFilePath -> Action (f v)
 uses_ key files = do
     res <- uses key files
     case sequence res of
@@ -1012,24 +1014,24 @@ uses_ key files = do
         Just v  -> return v
 
 -- | Plural version of 'use'
-uses :: IdeRule k v
-    => k -> [NormalizedFilePath] -> Action [Maybe v]
-uses key files = map (\(A value) -> currentValue value) <$> apply (map (Q . (key,)) files)
+uses :: (Traversable f, IdeRule k v)
+    => k -> f NormalizedFilePath -> Action (f (Maybe v))
+uses key files = fmap (\(A value) -> currentValue value) <$> apply (fmap (Q . (key,)) files)
 
 -- | Return the last computed result which might be stale.
-usesWithStale :: IdeRule k v
-    => k -> [NormalizedFilePath] -> Action [Maybe (v, PositionMapping)]
+usesWithStale :: (Traversable f, IdeRule k v)
+    => k -> f NormalizedFilePath -> Action (f (Maybe (v, PositionMapping)))
 usesWithStale key files = do
-    _ <- apply (map (Q . (key,)) files)
+    _ <- apply (fmap (Q . (key,)) files)
     -- We don't look at the result of the 'apply' since 'lastValue' will
     -- return the most recent successfully computed value regardless of
     -- whether the rule succeeded or not.
-    mapM (lastValue key) files
+    traverse (lastValue key) files
 
 useWithoutDependency :: IdeRule k v
     => k -> NormalizedFilePath -> Action (Maybe v)
 useWithoutDependency key file =
-    (\[A value] -> currentValue value) <$> applyWithoutDependency [Q (key, file)]
+    (\(Identity (A value)) -> currentValue value) <$> applyWithoutDependency (Identity (Q (key, file)))
 
 data RuleBody k v
   = Rule (k -> NormalizedFilePath -> Action (Maybe BS.ByteString, IdeResult v))

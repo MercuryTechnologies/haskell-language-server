@@ -24,7 +24,9 @@ module Experiments
 ) where
 import           Control.Applicative.Combinators (skipManyTill)
 import           Control.Exception.Safe          (IOException, handleAny, try)
-import           Control.Monad.Extra
+import           Control.Monad.Extra             (allM, forM, forM_, unless,
+                                                  void, whenJust, (&&^))
+import           Control.Monad.Fail              (MonadFail)
 import           Control.Monad.IO.Class
 import           Data.Aeson                      (Value (Null), toJSON)
 import           Data.Either                     (fromRight)
@@ -37,9 +39,8 @@ import           Development.IDE.Test            (getBuildEdgesCount,
                                                   getBuildKeysBuilt,
                                                   getBuildKeysChanged,
                                                   getBuildKeysVisited,
-                                                  getStoredKeys,
                                                   getRebuildsCount,
-                                                  )
+                                                  getStoredKeys)
 import           Development.IDE.Test.Diagnostic
 import           Development.Shake               (CmdOption (Cwd, FileStdout),
                                                   cmd_)
@@ -73,8 +74,13 @@ data DocumentPositions = DocumentPositions {
     doc            :: !TextDocumentIdentifier
 }
 
-allWithIdentifierPos :: Monad m => (DocumentPositions -> m Bool) -> [DocumentPositions] -> m Bool
-allWithIdentifierPos f docs = allM f (filter (isJust . identifierP) docs)
+allWithIdentifierPos :: MonadFail m => (DocumentPositions -> m Bool) -> [DocumentPositions] -> m Bool
+allWithIdentifierPos f docs = case applicableDocs of
+    -- fail if there are no documents to benchmark
+    []    -> fail "None of the example modules have identifier positions"
+    docs' -> allM f docs'
+  where
+    applicableDocs = filter (isJust . identifierP) docs
 
 experiments :: [Bench]
 experiments =
@@ -428,20 +434,20 @@ runBenchmarksFun dir allBenchmarks = do
         }
 
 data BenchRun = BenchRun
-  { startup       :: !Seconds,
-    runSetup      :: !Seconds,
-    runExperiment :: !Seconds,
-    userWaits     :: !Seconds,
-    delayedWork   :: !Seconds,
-    firstResponse :: !Seconds,
+  { startup              :: !Seconds,
+    runSetup             :: !Seconds,
+    runExperiment        :: !Seconds,
+    userWaits            :: !Seconds,
+    delayedWork          :: !Seconds,
+    firstResponse        :: !Seconds,
     firstResponseDelayed :: !Seconds,
-    rulesBuilt    :: !Int,
-    rulesChanged  :: !Int,
-    rulesVisited  :: !Int,
-    rulesTotal    :: !Int,
-    edgesTotal    :: !Int,
-    rebuildsTotal :: !Int,
-    success       :: !Bool
+    rulesBuilt           :: !Int,
+    rulesChanged         :: !Int,
+    rulesVisited         :: !Int,
+    rulesTotal           :: !Int,
+    edgesTotal           :: !Int,
+    rebuildsTotal        :: !Int,
+    success              :: !Bool
   }
 
 badRun :: BenchRun

@@ -28,10 +28,10 @@ import           Data.Default
 import           Data.Foldable
 import           Data.List.Extra
 import           Data.Maybe
-import           Data.Rope.UTF16                          (Rope)
-import qualified Data.Rope.UTF16                          as Rope
 import qualified Data.Set                                 as Set
 import qualified Data.Text                                as T
+import           Data.Text.Utf16.Rope                     (Rope)
+import qualified Data.Text.Utf16.Rope                     as Rope
 import           Development.IDE.Core.PositionMapping     (PositionResult (..),
                                                            fromCurrent,
                                                            positionResultToMaybe,
@@ -78,7 +78,7 @@ import qualified Language.LSP.Types.Lens                  as Lens (label)
 import qualified Language.LSP.Types.Lens                  as Lsp (diagnostics,
                                                                   message,
                                                                   params)
-import           Language.LSP.VFS                         (applyChange)
+import           Language.LSP.VFS                         (VfsLog, applyChange)
 import           Network.URI
 import           System.Directory
 import           System.Environment.Blank                 (getEnv, setEnv,
@@ -98,6 +98,7 @@ import           Control.Concurrent.Async
 import           Control.Lens                             (to, (.~), (^.))
 import           Control.Monad.Extra                      (whenJust)
 import           Data.Function                            ((&))
+import           Data.Functor.Identity                    (runIdentity)
 import           Data.IORef
 import           Data.IORef.Extra                         (atomicModifyIORef_)
 import           Data.String                              (IsString (fromString))
@@ -116,7 +117,8 @@ import           Development.IDE.Types.Logger             (Logger (Logger),
                                                            WithPriority (WithPriority, priority),
                                                            cfilter,
                                                            cmapWithPrio,
-                                                           makeDefaultStderrRecorder)
+                                                           makeDefaultStderrRecorder,
+                                                           toCologActionWithPrio)
 import qualified FuzzySearch
 import           GHC.Stack                                (emptyCallStack)
 import qualified HieDbRetry
@@ -128,6 +130,8 @@ import           Language.LSP.Types.Lens                  (didChangeWatchedFiles
 import qualified Language.LSP.Types.Lens                  as L
 import qualified Progress
 import           System.Time.Extra
+import qualified Test.QuickCheck.Monadic                  as MonadicQuickCheck
+import           Test.QuickCheck.Monadic                  (forAllM, monadicIO)
 import           Test.Tasty
 import           Test.Tasty.ExpectedFailure
 import           Test.Tasty.HUnit
@@ -139,11 +143,13 @@ import           Text.Regex.TDFA                          ((=~))
 data Log
   = LogGhcIde Ghcide.Log
   | LogIDEMain IDE.Log
+  | LogVfs VfsLog
 
 instance Pretty Log where
   pretty = \case
     LogGhcIde log  -> pretty log
     LogIDEMain log -> pretty log
+    LogVfs log     -> pretty log
 
 -- | Wait for the next progress begin step
 waitForProgressBegin :: Session ()
@@ -210,7 +216,7 @@ main = do
     , safeTests
     , unitTests recorder logger
     , haddockTests
-    , positionMappingTests
+    , positionMappingTests recorder
     , watchedFilesTests
     , cradleTests
     , dependentFileTest
@@ -250,7 +256,7 @@ initializeResponseTests = withResource acquire release tests where
     , chk "   find references"          _referencesProvider (Just $ InL True)
     , chk "   doc highlight"     _documentHighlightProvider (Just $ InL True)
     , chk "   doc symbol"           _documentSymbolProvider (Just $ InL True)
-    , chk "   workspace symbol"    _workspaceSymbolProvider (Just True)
+    , chk "   workspace symbol"    _workspaceSymbolProvider (Just $ InL True)
     , chk "   code action"             _codeActionProvider  (Just $ InL True)
     , chk "   code lens"                 _codeLensProvider  (Just $ CodeLensOptions (Just False) (Just False))
     , chk "NO doc formatting"   _documentFormattingProvider (Just $ InL False)
@@ -284,7 +290,8 @@ initializeResponseTests = withResource acquire release tests where
             doTest = do
                 ir <- getInitializeResponse
                 let Just ExecuteCommandOptions {_commands = List commands} = getActual $ innerCaps ir
-                zipWithM_ (\e o -> T.isSuffixOf e o @? show (e,o)) expected commands
+                    commandNames = (!! 2) . T.splitOn ":" <$> commands
+                zipWithM_ (\e o -> T.isSuffixOf e o @? show (e,o)) (sort expected) (sort commandNames)
 
   innerCaps :: ResponseMessage Initialize -> ServerCapabilities
   innerCaps (ResponseMessage _ _ (Right (InitializeResult c _))) = c
@@ -1879,6 +1886,28 @@ extendImportTests = testGroup "extend import actions"
             (T.unlines
                     [ "module ModuleB where"
                     , "import ModuleA (stuffB, stuffA"
+                    , "               )"
+                    , "main = print (stuffA, stuffB)"
+                    ])
+        , testSession "extend multi line import with trailing comma" $ template
+            [("ModuleA.hs", T.unlines
+                    [ "module ModuleA where"
+                    , "stuffA :: Double"
+                    , "stuffA = 0.00750"
+                    , "stuffB :: Integer"
+                    , "stuffB = 123"
+                    ])]
+            ("ModuleB.hs", T.unlines
+                    [ "module ModuleB where"
+                    , "import ModuleA (stuffB,"
+                    , "               )"
+                    , "main = print (stuffA, stuffB)"
+                    ])
+            (Range (Position 3 17) (Position 3 18))
+            ["Add stuffA to the import list of ModuleA"]
+            (T.unlines
+                    [ "module ModuleB where"
+                    , "import ModuleA (stuffB, stuffA,"
                     , "               )"
                     , "main = print (stuffA, stuffB)"
                     ])
@@ -4261,8 +4290,8 @@ canonicalizeLocation (Location uri range) = Location <$> canonicalizeUri uri <*>
 findDefinitionAndHoverTests :: TestTree
 findDefinitionAndHoverTests = let
 
-  tst :: (TextDocumentIdentifier -> Position -> Session a, a -> Session [Expect] -> Session ()) -> Position -> Session [Expect] -> String -> TestTree
-  tst (get, check) pos targetRange title = testSessionWithExtraFiles "hover" title $ \dir -> do
+  tst :: (TextDocumentIdentifier -> Position -> Session a, a -> Session [Expect] -> Session ()) -> Position -> String -> Session [Expect] -> String -> TestTree
+  tst (get, check) pos sfp targetRange title = testSessionWithExtraFiles "hover" title $ \dir -> do
 
     -- Dirty the cache to check that definitions work even in the presence of iface files
     liftIO $ runInDir dir $ do
@@ -4272,7 +4301,7 @@ findDefinitionAndHoverTests = let
       _ <- getHover fooDoc $ Position 4 3
       closeDoc fooDoc
 
-    doc <- openTestDataDoc (dir </> sourceFilePath)
+    doc <- openTestDataDoc (dir </> sfp)
     waitForProgressDone
     found <- get doc pos
     check found targetRange
@@ -4330,16 +4359,25 @@ findDefinitionAndHoverTests = let
           [ ( "GotoHover.hs", [(DsError, (62, 7), "Found hole: _")])
           , ( "GotoHover.hs", [(DsError, (65, 8), "Found hole: _")])
           ]
-    , testGroup "type-definition" typeDefinitionTests ]
+    , testGroup "type-definition" typeDefinitionTests
+    , testGroup "hover-record-dot-syntax" recordDotSyntaxTests ]
 
-  typeDefinitionTests = [ tst (getTypeDefinitions, checkDefs) aaaL14 (pure tcData) "Saturated data con"
-                        , tst (getTypeDefinitions, checkDefs) aL20 (pure [ExpectNoDefinitions]) "Polymorphic variable"]
+  typeDefinitionTests = [ tst (getTypeDefinitions, checkDefs) aaaL14 sourceFilePath (pure tcData) "Saturated data con"
+                        , tst (getTypeDefinitions, checkDefs) aL20 sourceFilePath (pure [ExpectNoDefinitions]) "Polymorphic variable"]
+
+  recordDotSyntaxTests
+    | ghcVersion >= GHC92 =
+        [ tst (getHover, checkHover) (Position 19 24) (T.unpack "RecordDotSyntax.hs") (pure [ExpectHoverText ["x :: MyRecord"]]) "hover over parent"
+        , tst (getHover, checkHover) (Position 19 25) (T.unpack "RecordDotSyntax.hs") (pure [ExpectHoverText ["_ :: MyChild"]]) "hover over dot shows child"
+        , tst (getHover, checkHover) (Position 19 26) (T.unpack "RecordDotSyntax.hs") (pure [ExpectHoverText ["_ :: MyChild"]]) "hover over child"
+        ]
+    | otherwise = []
 
   test runDef runHover look expect = testM runDef runHover look (return expect)
 
   testM runDef runHover look expect title =
-    ( runDef   $ tst def   look expect title
-    , runHover $ tst hover look expect title ) where
+    ( runDef   $ tst def   look sourceFilePath expect title
+    , runHover $ tst hover look sourceFilePath expect title ) where
       def   = (getDefinitions, checkDefs)
       hover = (getHover      , checkHover)
 
@@ -4439,7 +4477,11 @@ findDefinitionAndHoverTests = let
   , test  no     yes    holeL65    hleInfo2      "hole with variable"
   , test  no     yes    cccL17     docLink       "Haddock html links"
   , testM yes    yes    imported   importedSig   "Imported symbol"
-  , testM yes    yes    reexported reexportedSig "Imported symbol (reexported)"
+  , if | isWindows ->
+        -- Flaky on Windows: https://github.com/haskell/haskell-language-server/issues/2997
+        testM no     yes    reexported reexportedSig "Imported symbol (reexported)"
+       | otherwise ->
+        testM yes    yes    reexported reexportedSig "Imported symbol (reexported)"
   , if | ghcVersion == GHC90 && isWindows ->
         test  no     broken    thLocL57   thLoc         "TH Splice Hover"
        | ghcVersion == GHC92 && (isWindows || isMac) ->
@@ -6339,7 +6381,8 @@ clientSettingsTest = testGroup "client settings handling"
             void $ skipManyTill anyMessage $ message SClientRegisterCapability
             void $ createDoc "A.hs" "haskell" "module A where"
             waitForProgressDone
-            sendNotification SWorkspaceDidChangeConfiguration (DidChangeConfigurationParams (toJSON ("" :: String)))
+            sendNotification SWorkspaceDidChangeConfiguration
+                (DidChangeConfigurationParams (toJSON (mempty :: A.Object)))
             skipManyTill anyMessage restartingBuildSession
 
     ]
@@ -6708,24 +6751,26 @@ unitTests recorder logger = do
          let expected = "1:2-3:4"
          assertBool (unwords ["expected to find range", expected, "in diagnostic", shown]) $
              expected `isInfixOf` shown
-     , testCase "notification handlers run sequentially" $ do
+     , testCase "notification handlers run in priority order" $ do
         orderRef <- newIORef []
         let plugins = pluginDescToIdePlugins $
-                [ (defaultPluginDescriptor $ fromString $ show i)
+                [ (priorityPluginDescriptor i)
                     { pluginNotificationHandlers = mconcat
                         [ mkPluginNotificationHandler LSP.STextDocumentDidOpen $ \_ _ _ _ ->
                             liftIO $ atomicModifyIORef_ orderRef (i:)
                         ]
                     }
-                    | i <- [(1::Int)..20]
+                    | i <- [1..20]
                 ] ++ Ghcide.descriptors (cmapWithPrio LogGhcIde recorder)
+            priorityPluginDescriptor i = (defaultPluginDescriptor $ fromString $ show i){pluginPriority = i}
 
         testIde recorder (IDE.testing (cmapWithPrio LogIDEMain recorder) logger){IDE.argsHlsPlugins = plugins} $ do
             _ <- createDoc "A.hs" "haskell" "module A where"
             waitForProgressDone
-            actualOrder <- liftIO $ readIORef orderRef
+            actualOrder <- liftIO $ reverse <$> readIORef orderRef
 
-            liftIO $ actualOrder @?= reverse [(1::Int)..20]
+            -- Handlers are run in priority descending order
+            liftIO $ actualOrder @?= [20, 19 .. 1]
      , ignoreTestBecause "The test fails sometimes showing 10000us" $
          testCase "timestamps have millisecond resolution" $ do
            resolution_us <- findResolution_us 1
@@ -6834,10 +6879,8 @@ testIde recorder arguments session = do
     flip finally (setCurrentDirectory cwd) $ withAsync server $ \_ ->
         runSessionWithHandles hInWrite hOutRead config lspTestCaps projDir session
 
-
-
-positionMappingTests :: TestTree
-positionMappingTests =
+positionMappingTests :: Recorder (WithPriority Log) -> TestTree
+positionMappingTests recorder =
     testGroup "position mapping"
         [ testGroup "toCurrent"
               [ testCase "before" $
@@ -6955,7 +6998,8 @@ positionMappingTests =
                         rope <- genRope
                         range <- genRange rope
                         PrintableText replacement <- arbitrary
-                        let newRope = applyChange rope (TextDocumentContentChangeEvent (Just range) Nothing replacement)
+                        let newRope = runIdentity $ applyChange mempty rope
+                                (TextDocumentContentChangeEvent (Just range) Nothing replacement)
                         newPos <- genPosition newRope
                         pure (range, replacement, newPos)
                 forAll
@@ -6978,19 +7022,19 @@ genRope = Rope.fromText . getPrintableText <$> arbitrary
 
 genPosition :: Rope -> Gen Position
 genPosition r = do
-    let rows = Rope.rows r
+    let rows :: Int = fromIntegral $ Rope.lengthInLines r
     row <- choose (0, max 0 $ rows - 1) `suchThat` inBounds @UInt
-    let columns = Rope.columns (nthLine row r)
+    let columns = T.length (nthLine (fromIntegral row) r)
     column <- choose (0, max 0 $ columns - 1) `suchThat` inBounds @UInt
     pure $ Position (fromIntegral row) (fromIntegral column)
 
 genRange :: Rope -> Gen Range
 genRange r = do
-    let rows = Rope.rows r
+    let rows :: Int = fromIntegral $ Rope.lengthInLines r
     startPos@(Position startLine startColumn) <- genPosition r
     let maxLineDiff = max 0 $ rows - 1 - fromIntegral startLine
     endLine <- choose (fromIntegral startLine, fromIntegral startLine + maxLineDiff) `suchThat` inBounds @UInt
-    let columns = Rope.columns (nthLine (fromIntegral endLine) r)
+    let columns = T.length (nthLine (fromIntegral endLine) r)
     endColumn <-
         if fromIntegral startLine == endLine
             then choose (fromIntegral startColumn, columns)
@@ -7002,12 +7046,10 @@ inBounds :: forall b a . (Integral a, Integral b, Bounded b) => a -> Bool
 inBounds a = let i = toInteger a in i <= toInteger (maxBound @b) && i >= toInteger (minBound @b)
 
 -- | Get the ith line of a rope, starting from 0. Trailing newline not included.
-nthLine :: Int -> Rope -> Rope
+nthLine :: Int -> Rope -> T.Text
 nthLine i r
-    | i < 0 = error $ "Negative line number: " <> show i
-    | i == 0 && Rope.rows r == 0 = r
-    | i >= Rope.rows r = error $ "Row number out of bounds: " <> show i <> "/" <> show (Rope.rows r)
-    | otherwise = Rope.takeWhile (/= '\n') $ fst $ Rope.splitAtLine 1 $ snd $ Rope.splitAtLine (i - 1) r
+    | Rope.null r = ""
+    | otherwise = Rope.lines r !! i
 
 getWatchedFilesSubscriptionsUntil :: forall m. SServerMethod m -> Session [DidChangeWatchedFilesRegistrationOptions]
 getWatchedFilesSubscriptionsUntil m = do
