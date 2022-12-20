@@ -1107,7 +1107,7 @@ getLinkableRule recorder =
               Just obj_t
                 | obj_t >= core_t -> pure ([], Just $ HomeModInfo hirModIface hirModDetails (Just $ LM (posixSecondsToUTCTime obj_t) (ms_mod ms) [DotO obj_file]))
               _ -> liftIO $ coreFileToLinkable linkableType (hscEnv session) ms hirModIface hirModDetails bin_core (error "object doesn't have time")
-        -- Record the linkable so we know not to unload it
+        -- Record the linkable so we know not to unload it, and unload old versions
         whenJust (hm_linkable =<< hmi) $ \(LM time mod _) -> do
             compiledLinkables <- getCompiledLinkables <$> getIdeGlobalAction
             liftIO $ modifyVar compiledLinkables $ \old -> do

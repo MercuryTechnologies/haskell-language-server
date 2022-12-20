@@ -89,15 +89,18 @@ instance NFData SB.StringBuffer where rnf = rwhnf
 instance Show Module where
     show = moduleNameString . moduleName
 
-#if !MIN_VERSION_ghc(9,3,0)
-instance Outputable a => Show (GenLocated SrcSpan a) where show = unpack . printOutputable
-
 instance (NFData l, NFData e) => NFData (GenLocated l e) where
     rnf (L l e) = rnf l `seq` rnf e
 
 instance NFData HsDocString where
     rnf = rwhnf
 
+#if MIN_VERSION_ghc(9,4,0)
+#else
+instance Outputable a => Show (GenLocated SrcSpan a) where show = unpack . printOutputable
+
+instance NFData HsDocString where
+    rnf = rwhnf
 #endif
 
 instance Show ModSummary where
