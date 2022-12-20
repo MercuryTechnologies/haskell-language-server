@@ -38,7 +38,7 @@ import           Prettyprinter                (Pretty (pretty), vsep)
 import           Data.Text.Prettyprint.Doc    (Pretty (pretty), vsep)
 #endif
 
-import GHC.Debug.Stub
+-- import GHC.Debug.Stub
 
 data Log
   = LogIdeMain IdeMain.Log
@@ -50,7 +50,7 @@ instance Pretty Log where
     LogPlugins pluginsLog -> pretty pluginsLog
 
 main :: IO ()
-main = withGhcDebug $ do
+main = {- withGhcDebug $ -} do
     -- plugin cli commands use stderr logger for now unless we change the args
     -- parser to get logging arguments first or do more complicated things
     pluginCliRecorder <- cmapWithPrio pretty <$> makeDefaultStderrRecorder Nothing Info
