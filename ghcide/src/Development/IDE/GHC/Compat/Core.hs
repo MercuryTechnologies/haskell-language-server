@@ -1015,11 +1015,11 @@ initObjLinker env =
 #endif
 
 loadDLL :: HscEnv -> String -> IO (Maybe String)
-loadDLL env =
+loadDLL env dll =
 #if !MIN_VERSION_ghc(9,2,0)
-    GHCi.loadDLL env
+    GHCi.loadDLL env dll
 #else
-    GHCi.loadDLL (GHCi.hscInterp env)
+    either Just (\_ -> Nothing) <$> GHCi.loadDLL (GHCi.hscInterp env) dll
 #endif
 
 unload :: HscEnv -> [Linkable] -> IO ()
