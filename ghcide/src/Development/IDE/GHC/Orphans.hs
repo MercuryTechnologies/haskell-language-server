@@ -112,10 +112,10 @@ instance NFData ModSummary where
 #if MIN_VERSION_ghc(9,2,0)
 instance Ord FastString where
     compare a b = if a == b then EQ else compare (fs_sbs a) (fs_sbs b)
-
+{-
 instance NFData (SrcSpanAnn' a) where
     rnf = rwhnf
-
+-}
 instance Bifunctor (GenLocated) where
     bimap f g (L l x) = L (f l) (g x)
 
@@ -148,10 +148,10 @@ instance Hashable ModuleName where
 
 instance NFData a => NFData (IdentifierDetails a) where
     rnf (IdentifierDetails a b) = rnf a `seq` rnf (length b)
-
+{-
 instance NFData RealSrcSpan where
     rnf = rwhnf
-
+-}
 srcSpanFileTag, srcSpanStartLineTag, srcSpanStartColTag,
     srcSpanEndLineTag, srcSpanEndColTag :: String
 srcSpanFileTag = "srcSpanFile"
@@ -198,10 +198,10 @@ instance Show ModGuts where
     show _ = "modguts"
 instance NFData ModGuts where
     rnf = rwhnf
-
+{-
 instance NFData (ImportDecl GhcPs) where
     rnf = rwhnf
-
+-}
 #if MIN_VERSION_ghc(9,5,0)
 instance (NFData (HsModule a)) where
 #elif MIN_VERSION_ghc(9,0,1)
