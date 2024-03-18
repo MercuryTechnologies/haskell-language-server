@@ -469,8 +469,8 @@ shareUsages iface
 #if !MIN_VERSION_ghc(9,7,0)
       {mi_usages = usages}
   where usages = map go (mi_usages iface)
-        go usg@UsageFile{} = usg {usg_file_path = fp}
-          where !fp = shareFilePath (usg_file_path usg)
+        go usg@UsageFile{} = usg {usg_file_path = Util.fsLit fp}
+          where !fp = shareFilePath (Util.unpackFS (usg_file_path usg))
         go usg = usg
 #endif
 
