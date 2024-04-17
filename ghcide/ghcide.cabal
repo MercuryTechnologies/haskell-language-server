@@ -40,6 +40,11 @@ flag pedantic
   default:     False
   manual:      True
 
+flag no-mi-globals
+  description: whether GHC is applied with no-mi-globals patch
+  default:     False
+  manual:      True
+
 library
   default-language:   Haskell2010
   build-depends:
@@ -245,6 +250,9 @@ library
       , ekg-wai
 
     cpp-options:   -DMONITORING_EKG
+
+  if flag(no-mi-globals)
+    cpp-options:   -D__NO_MI_GLOBALS__
 
 flag test-exe
   description: Build the ghcide-test-preprocessor executable
