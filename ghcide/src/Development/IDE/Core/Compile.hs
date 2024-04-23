@@ -487,7 +487,7 @@ mkHiFileResultNoCompile session tcm = do
                       Nothing
 #endif
                       tcGblEnv
-#ifdef __NO_MI_GLOBALS_
+#ifdef __NO_MI_GLOBALS__
   let iface = iface' { mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
 #else
   let iface = iface' { mi_globals = Nothing, mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
