@@ -1209,7 +1209,9 @@ getModSummaryFromImports env fp _modTime mContents = do
                 , ms_dyn_obj_date    = Nothing
                 , ms_ghc_prim_import = ghc_prim_import
                 , ms_hs_hash      = _src_hash
+#ifdef __DEP_JSON__
                 , ms_opts         = []
+#endif
 #else
                 , ms_hs_date      = _modTime
 #endif

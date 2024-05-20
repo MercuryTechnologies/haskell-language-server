@@ -45,6 +45,11 @@ flag no-mi-globals
   default:     False
   manual:      True
 
+flag dep-json
+  description: whether GHC is applied with dep-json patch
+  default:     False
+  manual:      True
+
 library
   default-language:   Haskell2010
   build-depends:
@@ -253,6 +258,9 @@ library
 
   if flag(no-mi-globals)
     cpp-options:   -D__NO_MI_GLOBALS__
+
+  if flag(dep-json)
+    cpp-options:   -D__DEP_JSON__
 
 flag test-exe
   description: Build the ghcide-test-preprocessor executable
