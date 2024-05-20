@@ -98,6 +98,11 @@ instance Ord FastString where
 instance NFData (SrcSpanAnn' a) where
     rnf = rwhnf
 #endif
+#if MIN_VERSION_GLASGOW_HASKELL(9,8,0,0)
+instance NFData a => NFData (EpAnn a) where
+  rnf (EpAnn a b c) = rnf a `seq` rnf b `seq` rnf c
+  rnf EpAnnNotUsed = rwhnf EpAnnNotUsed
+#endif
 instance Bifunctor (GenLocated) where
     bimap f g (L l x) = L (f l) (g x)
 
