@@ -42,6 +42,10 @@ import           GHC.Types.PkgQual
 import           GHC.Unit.Home.ModInfo
 #endif
 
+#if MIN_VERSION_GLASGOW_HASKELL(9,8,0,0)
+import Documentation.Haddock () -- orphans
+#endif
+
 -- Orphan instance for Shake.hs
 -- https://hub.darcs.net/ross/transformers/issue/86
 deriving instance (Semigroup (m a)) => Semigroup (ReaderT r m a)
@@ -98,11 +102,15 @@ instance Ord FastString where
 instance NFData (SrcSpanAnn' a) where
     rnf = rwhnf
 #endif
-#if MIN_VERSION_GLASGOW_HASKELL(9,8,0,0)
-instance NFData a => NFData (EpAnn a) where
-  rnf (EpAnn a b c) = rnf a `seq` rnf b `seq` rnf c
-  rnf EpAnnNotUsed = rwhnf EpAnnNotUsed
-#endif
+--  #if MIN_VERSION_GLASGOW_HASKELL(9,8,0,0)
+-- instance NFData EpAnnComments where
+--   rnf (EpaComments a) = rnf a
+--   rnf (EpaCommentsBalanced a b) = rnf a `seq` rnf b
+-- 
+-- instance NFData a => NFData (EpAnn a) where
+--   rnf (EpAnn a b c) = rnf a `seq` rnf b `seq` rnf c
+--   rnf EpAnnNotUsed = rwhnf EpAnnNotUsed
+--  #endif
 instance Bifunctor (GenLocated) where
     bimap f g (L l x) = L (f l) (g x)
 

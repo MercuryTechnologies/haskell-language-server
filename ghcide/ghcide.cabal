@@ -126,6 +126,9 @@ library
   else
     build-depends: unix
 
+  if (impl(ghc >= 9.8))
+    build-depends: haddock-api
+
   default-extensions:
     BangPatterns
     DataKinds
