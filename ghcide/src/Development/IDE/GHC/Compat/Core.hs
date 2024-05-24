@@ -680,8 +680,8 @@ initObjLinker env =
     GHCi.initObjLinker (GHCi.hscInterp env)
 
 loadDLL :: HscEnv -> String -> IO (Maybe String)
-loadDLL env =
-    GHCi.loadDLL (GHCi.hscInterp env)
+loadDLL env str =
+  fmap (either Just (const Nothing)) (GHCi.loadDLL (GHCi.hscInterp env) str)
 
 unload :: HscEnv -> [Linkable] -> IO ()
 unload hsc_env linkables =
