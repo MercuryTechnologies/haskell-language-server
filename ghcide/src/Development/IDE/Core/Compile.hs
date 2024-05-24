@@ -94,6 +94,7 @@ import           Development.IDE.Types.Options
 import           GHC                               (ForeignHValue,
                                                     GetDocsFailure (..),
                                                     parsedSource)
+import           GHC.Data.FastString               (unpackFS)
 import qualified GHC.LanguageExtensions            as LangExt
 import           GHC.Serialized
 import           HieDb                             hiding (withHieDb)
@@ -469,8 +470,8 @@ shareUsages iface
 #if !MIN_VERSION_ghc(9,7,0)
       {mi_usages = usages}
   where usages = map go (mi_usages iface)
-        go usg@UsageFile{} = usg {usg_file_path = fp}
-          where !fp = shareFilePath (usg_file_path usg)
+        go usg@UsageFile{} = usg {usg_file_path = Util.mkFastString $ fp}
+          where !fp = shareFilePath (unpackFS $ usg_file_path usg)
         go usg = usg
 #endif
 
@@ -487,7 +488,7 @@ mkHiFileResultNoCompile session tcm = do
                       Nothing
 #endif
                       tcGblEnv
-  let iface = iface' { mi_globals = Nothing, mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
+  let iface = iface' { mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
   pure $! mkHiFileResult ms iface details (tmrRuntimeModules tcm) Nothing
 
 mkHiFileResultCompile
@@ -515,13 +516,14 @@ mkHiFileResultCompile se session' tcm simplified_guts = catchErrs $ do
 #if MIN_VERSION_ghc(9,3,0)
                                               ms
 #endif
+                                              []
                                               simplified_guts
 
   final_iface' <- mkFullIface session partial_iface Nothing
 #if MIN_VERSION_ghc(9,4,2)
                     Nothing
 #endif
-  let final_iface = final_iface' {mi_globals = Nothing, mi_usages = filterUsages (mi_usages final_iface')} -- See Note [Clearing mi_globals after generating an iface]
+  let final_iface = final_iface' { mi_usages = filterUsages (mi_usages final_iface')} -- See Note [Clearing mi_globals after generating an iface]
 
   -- Write the core file now
   core_file <- do
