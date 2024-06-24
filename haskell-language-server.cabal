@@ -1631,11 +1631,11 @@ library
                   -- , stan
                   , moduleName
                   , pragmas
-                  , splice
+                  -- , splice
                   , alternateNumberFormat
                   , qualifyImportedNames
                   , codeRange
-                  , gadt
+                  -- , gadt
                   , explicitFixity
                   , explicitFields
                   -- , floskell
