@@ -255,17 +255,12 @@ initialiseSessionForEval needs_quickcheck st nfp = do
     -- However, the eval plugin (setContext specifically) requires the rdr_env
     -- for the current module - so get it from the Typechecked Module and add
     -- it back to the iface for the current module.
-    rdr_env <- tcg_rdr_env . tmrTypechecked <$> use_ TypeCheck nfp
+    -- rdr_env <- tcg_rdr_env . tmrTypechecked <$> use_ TypeCheck nfp
     let linkable_hsc = loadModulesHome (map (addRdrEnv . linkableHomeMod) linkables) deps_hsc
         addRdrEnv hmi
           | iface <- hm_iface hmi
           , ms_mod ms == mi_module iface
-          = hmi { hm_iface = iface { mi_globals = Just $!
-#if MIN_VERSION_ghc(9,8,0)
-                    forceGlobalRdrEnv
-#endif
-                      rdr_env
-                }}
+          = hmi { hm_iface = iface }
           | otherwise = hmi
 
     return (ms, linkable_hsc)
