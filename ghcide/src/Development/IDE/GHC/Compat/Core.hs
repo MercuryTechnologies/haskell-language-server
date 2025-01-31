@@ -701,16 +701,8 @@ initObjLinker env =
     GHCi.initObjLinker (GHCi.hscInterp env)
 
 loadDLL :: HscEnv -> String -> IO (Maybe String)
-loadDLL env str = do
-    res <- GHCi.loadDLL (GHCi.hscInterp env) str
-#if MIN_VERSION_ghc(9,11,0)
-    pure $
-      case res of
-        Left err_msg -> Just err_msg
-        Right _      -> Nothing
-#else
-    pure res
-#endif
+loadDLL env dll =
+    either Just (\_ -> Nothing) <$> GHCi.loadDLL (GHCi.hscInterp env) dll
 
 unload :: HscEnv -> [Linkable] -> IO ()
 unload hsc_env linkables =
