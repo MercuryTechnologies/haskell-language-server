@@ -33,6 +33,11 @@ flag pedantic
   default:     False
   manual:      True
 
+flag no-mi-globals
+  description: whether GHC is applied with no-mi-globals patch
+  default:     False
+  manual:      True
+
 common warnings
   ghc-options:
     -Werror=incomplete-patterns
@@ -208,6 +213,9 @@ library
   if flag(pedantic)
     ghc-options:
       -Werror
+
+  if flag(no-mi-globals)
+    cpp-options:   -D__NO_MI_GLOBALS__
 
 flag test-exe
   description: Build the ghcide-test-preprocessor executable

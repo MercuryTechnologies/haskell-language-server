@@ -114,9 +114,11 @@ instance Ord FastString where
 instance NFData (EpAnn a) where
   rnf = rwhnf
 #else
+#ifndef __NO_MI_GLOBALS__
 instance NFData (SrcSpanAnn' a) where
     rnf = rwhnf
 deriving instance Functor SrcSpanAnn'
+#endif
 #endif
 
 instance Bifunctor GenLocated where
@@ -144,10 +146,10 @@ instance Hashable ModuleName where
 
 instance NFData a => NFData (IdentifierDetails a) where
     rnf (IdentifierDetails a b) = rnf a `seq` rnf (length b)
-{-
+#ifndef __NO_MI_GLOBALS__
 instance NFData RealSrcSpan where
     rnf = rwhnf
--}
+#endif
 srcSpanFileTag, srcSpanStartLineTag, srcSpanStartColTag,
     srcSpanEndLineTag, srcSpanEndColTag :: String
 srcSpanFileTag = "srcSpanFile"

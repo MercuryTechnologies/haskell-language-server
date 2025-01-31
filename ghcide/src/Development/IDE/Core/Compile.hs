@@ -472,8 +472,16 @@ mkHiFileResultNoCompile session tcm = do
       tcGblEnv = tmrTypechecked tcm
   details <- makeSimpleDetails hsc_env_tmp tcGblEnv
   sf <- finalSafeMode (ms_hspp_opts ms) tcGblEnv
-  iface' <- mkIfaceTc hsc_env_tmp sf details ms Nothing tcGblEnv
+  iface' <- mkIfaceTc hsc_env_tmp sf details ms
+#if MIN_VERSION_ghc(9,5,0)
+                      Nothing
+#endif
+                      tcGblEnv
+#ifdef __NO_MI_GLOBALS__
+  let iface = iface' { mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
+#else
   let iface = iface' { mi_globals = Nothing, mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
+#endif
   pure $! mkHiFileResult ms iface details (tmrRuntimeModules tcm) Nothing
 
 mkHiFileResultCompile
@@ -493,21 +501,19 @@ mkHiFileResultCompile se session' tcm simplified_guts = catchErrs $ do
         (guts, details) <- tidyProgram tidy_opts simplified_guts
         pure (details, guts)
 
+#ifdef __NO_MI_GLOBALS__
+  let !partial_iface = force $ mkPartialIface session (cg_binds guts) details ms [] simplified_guts
+  final_iface' <- mkFullIface session partial_iface Nothing Nothing
+  let final_iface = final_iface' {mi_usages = filterUsages (mi_usages final_iface')} -- See Note [Clearing mi_globals after generating an iface]
+#else
   let !partial_iface = force $ mkPartialIface session
-#if MIN_VERSION_ghc(9,5,0)
                                               (cg_binds guts)
-#endif
                                               details
-#if MIN_VERSION_ghc(9,3,0)
                                               ms
-#endif
                                               simplified_guts
-
-  final_iface' <- mkFullIface session partial_iface Nothing
-#if MIN_VERSION_ghc(9,4,2)
-                    Nothing
-#endif
+  final_iface' <- mkFullIface session partial_iface Nothing Nothing
   let final_iface = final_iface' {mi_globals = Nothing, mi_usages = filterUsages (mi_usages final_iface')} -- See Note [Clearing mi_globals after generating an iface]
+#endif
 
   -- Write the core file now
   core_file <- do
