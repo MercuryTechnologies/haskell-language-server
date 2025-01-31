@@ -144,10 +144,10 @@ instance Hashable ModuleName where
 
 instance NFData a => NFData (IdentifierDetails a) where
     rnf (IdentifierDetails a b) = rnf a `seq` rnf (length b)
-
+{-
 instance NFData RealSrcSpan where
     rnf = rwhnf
-
+-}
 srcSpanFileTag, srcSpanStartLineTag, srcSpanStartColTag,
     srcSpanEndLineTag, srcSpanEndColTag :: String
 srcSpanFileTag = "srcSpanFile"
