@@ -1629,7 +1629,20 @@ coreFileToCgGuts session iface details core_file = do
       -- Implicit binds aren't saved, so we need to regenerate them ourselves.
   let _implicit_binds = concatMap getImplicitBinds tyCons -- only used if GHC < 9.6
       tyCons = typeEnvTyCons (md_types details)
-#if MIN_VERSION_ghc(9,5,0)
+#if MIN_VERSION_ghc(9,10,0)
+  pure $
+    CgGuts
+      { cg_module = this_mod
+      , cg_tycons = tyCons
+      , cg_binds = core_binds
+      , cg_ccs = []
+      , cg_foreign = NoStubs
+      , cg_foreign_files = []
+      , cg_dep_pkgs = mempty
+      , cg_modBreaks = Nothing
+      , cg_spt_entries = []
+      }
+#elif MIN_VERSION_ghc(9,5,0)
   -- In GHC 9.6, the implicit binds are tidied and part of core_binds
   pure $ CgGuts this_mod tyCons core_binds [] NoStubs [] mempty (emptyHpcInfo False) Nothing []
 #elif MIN_VERSION_ghc(9,3,0)
