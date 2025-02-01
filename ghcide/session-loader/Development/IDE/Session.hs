@@ -133,6 +133,10 @@ import           GHC.Types.Error                     (errMsgDiagnostic,
 import           GHC.Unit.State
 #endif
 
+#if MIN_VERSION_ghc(9,10,0)
+import           GHC.Unit.Module.Graph               (mgReachable)
+#endif
+
 data Log
   = LogSettingInitialDynFlags
   | LogGetInitialGhcLibDirDefaultCradleFail !CradleError !FilePath !(Maybe FilePath) !(Cradle Void)
@@ -853,7 +857,7 @@ checkHomeUnitsClosed' ue home_id_set
     -- downwards closure of graph
     downwards_closure
       = graphFromEdgedVerticesUniq [ DigraphNode uid uid (OS.toList deps)
-                                   | (uid, deps) <- Map.toList (allReachable graph node_key)]
+                                   | (uid, deps) <- Map.toList (mgReachable graph node_key)]
 
     inverse_closure = transposeG downwards_closure
 
