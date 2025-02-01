@@ -350,7 +350,12 @@ captureSplicesAndDeps TypecheckHelpers{..} env k = do
 
     -- Compute the transitive set of linkables required
     getTransitiveMods hsc_env needed_mods
-#if MIN_VERSION_ghc(9,3,0)
+#if MIN_VERSION_ghc(9,10,0)
+      = Set.unions (Set.fromList (map moduleToNodeKey mods) : [ dep | m <- mods
+                                                              , Just dep <- fmap mkNodeKey <$> mgReachable (hsc_mod_graph hsc_env) (moduleToNodeKey m)
+                                                              ])
+      where mods = nonDetEltsUniqSet needed_mods -- OK because we put them into a set immediately after
+#elif MIN_VERSION_ghc(9,3,0)
       = Set.unions (Set.fromList (map moduleToNodeKey mods) : [ dep | m <- mods
                                                               , Just dep <- [Map.lookup (moduleToNodeKey m) (mgTransDeps (hsc_mod_graph hsc_env))]
                                                               ])
