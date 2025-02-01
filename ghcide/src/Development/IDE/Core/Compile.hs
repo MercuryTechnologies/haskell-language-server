@@ -503,7 +503,7 @@ mkHiFileResultCompile se session' tcm simplified_guts = catchErrs $ do
 
 #ifdef __NO_MI_GLOBALS__
   let !partial_iface = force $ mkPartialIface session (cg_binds guts) details ms [] simplified_guts
-  final_iface' <- mkFullIface session partial_iface Nothing Nothing
+  final_iface' <- mkFullIface session partial_iface Nothing Nothing []
   let final_iface = final_iface' {mi_usages = filterUsages (mi_usages final_iface')} -- See Note [Clearing mi_globals after generating an iface]
 #else
   let !partial_iface = force $ mkPartialIface session
