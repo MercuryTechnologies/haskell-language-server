@@ -1195,6 +1195,9 @@ getModSummaryFromImports env fp _modTime mContents = do
             ModSummary
                 { ms_mod          = modl
                 , ms_hie_date     = Nothing
+#if MIN_VERSION_ghc(9,10,0)
+                , ms_opts         = []
+#endif
 #if MIN_VERSION_ghc(9,3,0)
                 , ms_dyn_obj_date    = Nothing
                 , ms_ghc_prim_import = ghc_prim_import
