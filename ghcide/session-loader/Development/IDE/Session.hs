@@ -135,6 +135,7 @@ import           GHC.Unit.State
 
 #if MIN_VERSION_ghc(9,10,0)
 import           GHC.Unit.Module.Graph               (mgReachable)
+import           GHC.Data.Graph.Directed.Reachability
 #endif
 
 data Log
@@ -854,14 +855,12 @@ checkHomeUnitsClosed' ue home_id_set
     graph :: Graph (Node UnitId UnitId)
     graph = graphFromEdgedVerticesUniq graphNodes
 
-    -- downwards closure of graph
-    downwards_closure
-      = graphFromEdgedVerticesUniq [ DigraphNode uid uid (OS.toList deps)
-                                   | (uid, deps) <- Map.toList (mgReachable graph node_key)]
+    downwards_closure :: Graph (Node UnitId UnitId)
+    downwards_closure = graphFromEdgedVerticesUniq graphNodes
 
-    inverse_closure = transposeG downwards_closure
+    inverse_closure = graphReachability $ transposeG downwards_closure
 
-    upwards_closure = OS.fromList $ map node_key $ reachablesG inverse_closure [DigraphNode uid uid [] | uid <- OS.toList home_id_set]
+    upwards_closure = OS.fromList $ map node_key $ allReachableMany inverse_closure [DigraphNode uid uid [] | uid <- OS.toList home_id_set]
 
     all_unit_direct_deps :: UniqMap UnitId (OS.Set UnitId)
     all_unit_direct_deps
