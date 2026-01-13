@@ -185,7 +185,7 @@ locateModule env comp_info exts targetFor modName mbPkgName isSource = do
     ue = hsc_unit_env env
     units = homeUnitEnv_units $ ue_findHomeUnitEnv (homeUnitId_ dflags) ue
     hpt_deps :: [UnitId]
-    hpt_deps = homeUnitDepends units
+    hpt_deps = S.toList (homeUnitDepends units)
 #else
       _import_paths'
 #endif

@@ -89,6 +89,8 @@ import           GHC.Types.PkgQual                     (PkgQual (NoPkgQual))
 import           GHC.Unit.Home.ModInfo
 #endif
 
+import GHC.Driver.Env (hscUnitIndex, hscUnitIndexQuery)
+import System.IO.Unsafe (unsafePerformIO)
 
 type PreloadUnitClosure = UniqSet UnitId
 
@@ -110,12 +112,15 @@ initUnits unitDflags env = do
   -- additionally, set checked dflags so we don't lose fixes
   let initial_home_graph = createUnitEnvFromFlags (dflags0 NE.:| unitDflags)
       home_units = unitEnv_keys initial_home_graph
+
+  let ue_idx = hscUnitIndex env
+      
   home_unit_graph <- forM initial_home_graph $ \homeUnitEnv -> do
     let cached_unit_dbs = homeUnitEnv_unit_dbs homeUnitEnv
         dflags = homeUnitEnv_dflags homeUnitEnv
         old_hpt = homeUnitEnv_hpt homeUnitEnv
 
-    (dbs,unit_state,home_unit,mconstants) <- State.initUnits (hsc_logger env) dflags cached_unit_dbs home_units
+    (dbs,unit_state,home_unit,mconstants) <- State.initUnits (hsc_logger env) dflags ue_idx cached_unit_dbs home_units
 
     updated_dflags <- DynFlags.updatePlatformConstants dflags mconstants
     pure HomeUnitEnv
@@ -133,6 +138,7 @@ initUnits unitDflags env = do
         , ue_home_unit_graph = home_unit_graph
         , ue_current_unit    = homeUnitId_ dflags0
         , ue_eps             = ue_eps (hsc_unit_env env)
+        , ue_index           = ue_idx
         }
   pure $ hscSetFlags dflags1 $ hscSetUnitEnv unit_env env
 #else
@@ -157,7 +163,7 @@ explicitUnits ue =
 
 listVisibleModuleNames :: HscEnv -> [ModuleName]
 listVisibleModuleNames env =
-  State.listVisibleModuleNames $ unitState env
+  State.listVisibleModuleNames (unitState env) (unsafePerformIO (hscUnitIndexQuery env))
 
 getUnitName :: HscEnv -> UnitId -> Maybe PackageName
 getUnitName env i =
@@ -173,7 +179,7 @@ lookupModuleWithSuggestions
 #endif
   -> LookupResult
 lookupModuleWithSuggestions env modname mpkg =
-  State.lookupModuleWithSuggestions (unitState env) modname mpkg
+  State.lookupModuleWithSuggestions (unitState env) (unsafePerformIO $ hscUnitIndexQuery env) modname mpkg
 
 getUnitInfoMap :: HscEnv -> UnitInfoMap
 getUnitInfoMap =

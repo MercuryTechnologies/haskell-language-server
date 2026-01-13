@@ -133,6 +133,8 @@ import           GHC.Unit.Module.Warnings
 import           Development.IDE.Core.FileStore    (shareFilePath)
 #endif
 
+import GHC.Driver.Env (hscUnitIndexQuery)
+
 --Simple constants to make sure the source is consistently named
 sourceTypecheck :: T.Text
 sourceTypecheck = "typecheck"
@@ -1139,6 +1141,7 @@ getModSummaryFromImports env fp _modTime mContents = do
 
     let dflags = hsc_dflags ppEnv
 
+    query <- liftIO $ hscUnitIndexQuery env
     -- The warns will hopefully be reported when we actually parse the module
     (_warns, L main_loc hsmod) <- parseHeader dflags fp contents
 
@@ -1172,7 +1175,7 @@ getModSummaryFromImports env fp _modTime mContents = do
         msrImports = implicit_imports ++ imps
 
 #if MIN_VERSION_ghc(9,3,0)
-        rn_pkg_qual = renameRawPkgQual (hsc_unit_env ppEnv)
+        rn_pkg_qual = renameRawPkgQual (hsc_unit_env ppEnv) query
         rn_imps = fmap (\(pk, lmn@(L _ mn)) -> (rn_pkg_qual mn pk, lmn))
         srcImports = rn_imps $ map convImport src_idecls
         textualImports = rn_imps $ map convImport (implicit_imports ++ ordinary_imps)

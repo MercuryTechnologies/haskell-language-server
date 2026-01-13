@@ -88,6 +88,8 @@ import           GHC.Driver.Errors.Types      (DriverMessage, GhcMessage)
 import           GHC.Types.Error              (defaultDiagnosticOpts)
 #endif
 
+import           System.IO.Unsafe
+
 #if MIN_VERSION_ghc(9,5,0)
 type PrintUnqualified = NamePprCtx
 #endif
@@ -155,7 +157,7 @@ type WarnMsg  = MsgEnvelope DecoratedSDoc
 mkPrintUnqualifiedDefault :: HscEnv -> GlobalRdrEnv -> PrintUnqualified
 #if MIN_VERSION_ghc(9,5,0)
 mkPrintUnqualifiedDefault env =
-  mkNamePprCtx ptc (hsc_unit_env env)
+  mkNamePprCtx ptc (hsc_unit_env env) (unsafePerformIO (hscUnitIndexQuery env))
     where
       ptc = initPromotionTickContext (hsc_dflags env)
 #else
