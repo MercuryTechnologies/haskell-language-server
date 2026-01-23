@@ -130,6 +130,7 @@ import           GHC.Driver.Env                      (hsc_all_home_unit_ids)
 import           GHC.Driver.Errors.Types
 import           GHC.Types.Error                     (errMsgDiagnostic,
                                                       singleMessage)
+import           GHC.Unit.Home.Graph
 import           GHC.Unit.State
 #endif
 

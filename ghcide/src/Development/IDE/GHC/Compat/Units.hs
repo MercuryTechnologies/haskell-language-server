@@ -89,6 +89,7 @@ import           GHC.Types.PkgQual                     (PkgQual (NoPkgQual))
 import           GHC.Unit.Home.Graph
 import           GHC.Unit.Home.ModInfo
 import           GHC.Unit.Home.PackageTable
+import           GHC.Unit.State                        (emptyUnitState)
 #endif
 
 import GHC.Driver.Env (hscUnitIndex, hscUnitIndexQuery)
@@ -103,7 +104,7 @@ unitState = ue_units . hsc_unit_env
 createUnitEnvFromFlags :: NE.NonEmpty DynFlags -> HomeUnitGraph
 createUnitEnvFromFlags unitDflags =
   let
-    newInternalUnitEnv dflags = mkHomeUnitEnv dflags emptyHomePackageTable Nothing
+    newInternalUnitEnv dflags = mkHomeUnitEnv emptyUnitState Nothing dflags (unsafePerformIO emptyHomePackageTable) Nothing
     unitEnvList = NE.map (\dflags -> (homeUnitId_ dflags, newInternalUnitEnv dflags)) unitDflags
   in
     unitEnv_new (Map.fromList (NE.toList (unitEnvList)))

@@ -94,7 +94,7 @@ writeBinCoreFile core_path fat_iface = do
     let quietTrace =
           QuietBinIFace
 
-    putWithUserData quietTrace bh fat_iface
+    putWithUserData quietTrace NormalCompression bh fat_iface
 
     -- And send the result to the file
     writeBinMem bh core_path

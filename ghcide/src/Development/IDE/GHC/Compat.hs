@@ -190,8 +190,8 @@ import           GHC.StgToByteCode
 import           GHC.Types.CostCentre
 import           GHC.Types.IPE
 import           GHC.Types.SrcLoc                        (combineRealSrcSpans)
-import           GHC.Unit.Home.ModInfo                   (HomePackageTable,
-                                                          lookupHpt)
+import           GHC.Unit.Home.Graph
+import           GHC.Unit.Home.PackageTable              (HomePackageTable, lookupHpt)
 import           GHC.Unit.Module.ModIface
 
 -- See Note [Guidelines For Using CPP In GHCIDE Import Statements]
@@ -569,7 +569,8 @@ loadModulesHome
     -> HscEnv
 loadModulesHome mod_infos e =
 #if MIN_VERSION_ghc(9,3,0)
-  hscUpdateHUG (\hug -> foldl' (flip addHomeModInfoToHug) hug mod_infos) (e { hsc_type_env_vars = emptyKnotVars })
+  -- THIS IS VERY WRONG BUT NOW HPT IS NOT PURE ANY MORE
+  hscUpdateHUG (\hug -> {- foldl' (flip addHomeModInfoToHug) hug mod_infos -} hug) (e { hsc_type_env_vars = emptyKnotVars })
 #else
   let !new_modules = addListToHpt (hsc_HPT e) [(mod_name x, x) | x <- mod_infos]
   in e { hsc_HPT = new_modules

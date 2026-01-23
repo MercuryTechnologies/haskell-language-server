@@ -133,6 +133,7 @@ import           GHC.Unit.Module.Warnings
 import           Development.IDE.Core.FileStore    (shareFilePath)
 #endif
 
+import GHC.Unit.Home.Graph
 import GHC.Driver.Env (hscUnitIndexQuery)
 
 --Simple constants to make sure the source is consistently named
@@ -204,6 +205,8 @@ typecheckModule (IdeDefer defer) hsc tc_helpers pm = do
 -- | Install hooks to capture the splices as well as the runtime module dependencies
 captureSplicesAndDeps :: TypecheckHelpers -> HscEnv -> (HscEnv -> IO a) -> IO (a, Splices, ModuleEnv BS.ByteString)
 captureSplicesAndDeps TypecheckHelpers{..} env k = do
+  undefined
+{-
   splice_ref <- newIORef mempty
   dep_ref <- newIORef emptyModuleEnv
   res <- k (hscSetHooks (addSpliceHook splice_ref . addLinkableDepHook dep_ref $ hsc_hooks env) env)
@@ -404,7 +407,7 @@ captureSplicesAndDeps TypecheckHelpers{..} env k = do
             aw' <- metaRequestAW hook e
             liftIO $ modifyIORef' var $ awSplicesL %~ ((e, aw') :)
             pure $ f aw'
-
+-}
 
 tcRnModule
   :: HscEnv
@@ -474,6 +477,8 @@ shareUsages iface
 
 mkHiFileResultNoCompile :: HscEnv -> TcModuleResult -> IO HiFileResult
 mkHiFileResultNoCompile session tcm = do
+  undefined
+{-
   let hsc_env_tmp = hscSetFlags (ms_hspp_opts ms) session
       ms = pm_mod_summary $ tmrParsed tcm
       tcGblEnv = tmrTypechecked tcm
@@ -490,14 +495,15 @@ mkHiFileResultNoCompile session tcm = do
   let iface = iface' { mi_globals = Nothing, mi_usages = filterUsages (mi_usages iface') } -- See Note [Clearing mi_globals after generating an iface]
 #endif
   pure $! mkHiFileResult ms iface details (tmrRuntimeModules tcm) Nothing
-
+-}
+  
 mkHiFileResultCompile
     :: ShakeExtras
     -> HscEnv
     -> TcModuleResult
     -> ModGuts
     -> IO (IdeResult HiFileResult)
-mkHiFileResultCompile se session' tcm simplified_guts = catchErrs $ do
+mkHiFileResultCompile se session' tcm simplified_guts = undefined {- catchErrs $ do
   let session = hscSetFlags (ms_hspp_opts ms) session'
       ms = pm_mod_summary $ tmrParsed tcm
 
@@ -615,7 +621,8 @@ mkHiFileResultCompile se session' tcm simplified_guts = catchErrs $ do
       , Handler $ return . (,Nothing) . diagFromString source DiagnosticSeverity_Error (noSpan "<internal>")
       . (("Error during " ++ T.unpack source) ++) . show @SomeException
       ]
-
+-}
+  
 -- | Whether we should run the -O0 simplifier when generating core.
 --
 -- This is required for template Haskell to work but we disable this in DAML.
@@ -1060,7 +1067,7 @@ handleGenerationErrors' dflags source action =
 -- HomeModInfo's of all direct dependencies (by induction hypothesis all
 -- transitive dependencies will be contained in envs)
 mergeEnvs :: HscEnv -> ModuleGraph -> ModSummary -> [HomeModInfo] -> [HscEnv] -> IO HscEnv
-mergeEnvs env mg ms extraMods envs = do
+mergeEnvs env mg ms extraMods envs = undefined {- do
 #if MIN_VERSION_ghc(9,3,0)
     let im  = Compat.installedModule (toUnitId $ moduleUnit $ ms_mod ms) (moduleName (ms_mod ms))
         ifr = InstalledFound (ms_location ms) im
@@ -1121,6 +1128,7 @@ mergeEnvs env mg ms extraMods envs = do
         concatFC :: [FinderCache] -> FinderCache
         concatFC = unsafeCoerce (mconcat @(Map InstalledModule InstalledFindResult))
 #endif
+-}
 
 withBootSuffix :: HscSource -> ModLocation -> ModLocation
 withBootSuffix HsBootFile = addBootSuffixLocnOut
@@ -1615,13 +1623,14 @@ showReason (RecompBecause s) = s
 #endif
 
 mkDetailsFromIface :: HscEnv -> ModIface -> IO ModDetails
-mkDetailsFromIface session iface = do
+mkDetailsFromIface session iface = undefined {- do
   fixIO $ \details -> do
     let !hsc' = hscUpdateHPT (\hpt -> addToHpt hpt (moduleName $ mi_module iface) (HomeModInfo iface details emptyHomeModInfoLinkable)) session
     initIfaceLoad hsc' (typecheckIface iface)
-
+-}
+  
 coreFileToCgGuts :: HscEnv -> ModIface -> ModDetails -> CoreFile -> IO CgGuts
-coreFileToCgGuts session iface details core_file = do
+coreFileToCgGuts session iface details core_file = undefined {- do
   let act hpt = addToHpt hpt (moduleName this_mod)
                              (HomeModInfo iface details emptyHomeModInfoLinkable)
       this_mod = mi_module iface
@@ -1658,7 +1667,8 @@ coreFileToCgGuts session iface details core_file = do
 #else
   pure $ CgGuts this_mod tyCons (_implicit_binds ++ core_binds) NoStubs [] [] (emptyHpcInfo False) Nothing []
 #endif
-
+-}
+  
 coreFileToLinkable :: LinkableType -> HscEnv -> ModSummary -> ModIface -> ModDetails -> CoreFile -> UTCTime -> IO ([FileDiagnostic], Maybe HomeModInfo)
 coreFileToLinkable linkableType session ms iface details core_file t = do
   cgi_guts <- coreFileToCgGuts session iface details core_file
@@ -1678,12 +1688,14 @@ getDocsBatch
 #else
   -> IO [Either String (Maybe HsDocString, IntMap HsDocString)]
 #endif
+getDocsBatch = undefined
+{-
 getDocsBatch hsc_env _names = do
     res <- initIfaceLoad hsc_env $ forM _names $ \name ->
         case nameModule_maybe name of
             Nothing -> return (Left $ NameHasNoModule name)
             Just mod -> do
-             ModIface {
+             G.ModIface {
 #if MIN_VERSION_ghc(9,3,0)
                         mi_docs = Just Docs{ docs_mod_hdr = mb_doc_hdr
                                       , docs_decls = dmap
@@ -1719,6 +1731,7 @@ getDocsBatch hsc_env _names = do
       case nameSrcLoc n of
         RealSrcLoc {}   -> False
         UnhelpfulLoc {} -> True
+-}
 
 -- | Non-interactive, batch version of 'InteractiveEval.lookupNames'.
 --   The interactive paths create problems in ghc-lib builds
