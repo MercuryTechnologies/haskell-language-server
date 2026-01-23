@@ -482,6 +482,7 @@ import           GHC.Types.Var               (Var (varName), setTyVarUnique,
                                               setVarUnique)
 
 import qualified GHC.Types.Var               as TypesVar
+import           GHC.Unit.Home.PackageTable  (addListToHpt, addToHpt)
 import           GHC.Unit.Info               (PackageName (..))
 import           GHC.Unit.Module             hiding (ModLocation (..), UnitId,
                                               moduleUnit, toUnitId)
@@ -543,6 +544,7 @@ import           GHC.Unit.Module.Graph       (mkModuleGraph)
 #endif
 
 #if MIN_VERSION_ghc(9,3,0)
+import qualified GHC.Data.OsPath             as OsPath
 import qualified GHC.Data.Strict             as Strict
 import qualified GHC.Driver.Config.Finder    as GHC
 import qualified GHC.Driver.Config.Tidy      as GHC
@@ -566,7 +568,7 @@ import           GHC.Types.Avail             (greNamePrintableName)
 
 mkHomeModLocation :: DynFlags -> ModuleName -> FilePath -> IO Module.ModLocation
 #if MIN_VERSION_ghc(9,3,0)
-mkHomeModLocation df mn f = pure $ GHC.mkHomeModLocation (GHC.initFinderOpts df) mn f
+mkHomeModLocation df mn f = pure $ GHC.mkHomeModLocation (GHC.initFinderOpts df) mn (OsPath.unsafeEncodeUtf f)
 #else
 mkHomeModLocation = GHC.mkHomeModLocation
 #endif

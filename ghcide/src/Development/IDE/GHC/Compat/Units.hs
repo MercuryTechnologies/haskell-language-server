@@ -86,7 +86,9 @@ import qualified Data.Map.Strict                       as Map
 import qualified GHC
 import qualified GHC.Driver.Session                    as DynFlags
 import           GHC.Types.PkgQual                     (PkgQual (NoPkgQual))
+import           GHC.Unit.Home.Graph
 import           GHC.Unit.Home.ModInfo
+import           GHC.Unit.Home.PackageTable
 #endif
 
 import GHC.Driver.Env (hscUnitIndex, hscUnitIndexQuery)
