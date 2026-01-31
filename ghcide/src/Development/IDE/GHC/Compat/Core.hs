@@ -236,7 +236,7 @@ module Development.IDE.GHC.Compat.Core (
     ModuleOrigin(..),
     PackageName(..),
     -- * Linker
-    Unlinked(..),
+    LinkablePart(..),
     Linkable(..),
     unload,
     -- * Hooks

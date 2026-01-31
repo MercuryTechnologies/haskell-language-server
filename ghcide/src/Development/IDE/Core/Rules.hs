@@ -86,6 +86,7 @@ import qualified Data.IntMap.Strict                           as IntMap
 import           Data.IORef
 import           Data.List
 import           Data.List.Extra                              (nubOrdOn)
+import qualified Data.List.NonEmpty                           as NE
 import qualified Data.Map                                     as M
 import           Data.Maybe
 import           Data.Proxy
@@ -1110,10 +1111,10 @@ getLinkableRule recorder =
               else pure Nothing
             case mobj_time of
               Just obj_t
-                | obj_t >= core_t -> pure ([], Just $ HomeModInfo hirModIface hirModDetails (justObjects $ LM (posixSecondsToUTCTime obj_t) (ms_mod ms) [DotO obj_file]))
+                | obj_t >= core_t -> pure ([], Just $ HomeModInfo hirModIface hirModDetails (justObjects $ Linkable (posixSecondsToUTCTime obj_t) (ms_mod ms) (NE.singleton (DotO obj_file ModuleObject))))
               _ -> liftIO $ coreFileToLinkable linkableType (hscEnv session) ms hirModIface hirModDetails bin_core (error "object doesn't have time")
         -- Record the linkable so we know not to unload it, and unload old versions
-        whenJust ((homeModInfoByteCode =<< hmi) <|> (homeModInfoObject =<< hmi)) $ \(LM time mod _) -> do
+        whenJust ((homeModInfoByteCode =<< hmi) <|> (homeModInfoObject =<< hmi)) $ \(Linkable time mod _) -> do
             compiledLinkables <- getCompiledLinkables <$> getIdeGlobalAction
             liftIO $ modifyVar compiledLinkables $ \old -> do
               let !to_keep = extendModuleEnv old mod time
@@ -1127,7 +1128,7 @@ getLinkableRule recorder =
               --just before returning it to be loaded. This has a substantial effect on recompile
               --times as the number of loaded modules and splices increases.
               --
-              unload (hscEnv session) (map (\(mod', time') -> LM time' mod' []) $ moduleEnvToList to_keep)
+              unload (hscEnv session) (map (\(mod', time') -> Linkable time' mod' (NE.singleton undefined)) $ moduleEnvToList to_keep)
               return (to_keep, ())
         return (fileHash <$ hmi, (warns, LinkableResult <$> hmi <*> pure fileHash))
 

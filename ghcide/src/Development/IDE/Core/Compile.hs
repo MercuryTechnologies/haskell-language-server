@@ -61,6 +61,7 @@ import qualified Data.HashMap.Strict               as HashMap
 import           Data.IntMap                       (IntMap)
 import           Data.IORef
 import           Data.List.Extra
+import qualified Data.List.NonEmpty                as NE
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Proxy                        (Proxy (Proxy))
@@ -701,10 +702,10 @@ generateObjectCode session summary guts = do
 #else
                       return obj
 #endif
-              let unlinked = DotO dot_o_fp
+              let unlinked = DotO dot_o_fp ModuleObject
               -- Need time to be the modification time for recompilation checking
               t <- liftIO $ getModificationTime dot_o_fp
-              let linkable = LM t mod [unlinked]
+              let linkable = Linkable t mod (NE.singleton unlinked)
 
               pure (map snd warnings, linkable)
 
@@ -714,15 +715,15 @@ generateByteCode :: CoreFileTime -> HscEnv -> ModSummary -> CgGuts -> IO (IdeRes
 generateByteCode (CoreFileTime time) hscEnv summary guts = do
     fmap (either (, Nothing) (second Just)) $
           catchSrcErrors (hsc_dflags hscEnv) "bytecode" $ do
-              (warnings, (_, bytecode, sptEntries)) <-
+              (warnings, (_, bytecode {- , sptEntries -})) <-
                 withWarnings "bytecode" $ \_tweak -> do
                       let session = _tweak (hscSetFlags (ms_hspp_opts summary) hscEnv)
                           -- TODO: maybe settings ms_hspp_opts is unnecessary?
                           summary' = summary { ms_hspp_opts = hsc_dflags session }
                       hscInteractive session (mkCgInteractiveGuts guts)
                                 (ms_location summary')
-              let unlinked = BCOs bytecode sptEntries
-              let linkable = LM time (ms_mod summary) [unlinked]
+              let unlinked = BCOs bytecode -- sptEntries
+              let linkable = Linkable time (ms_mod summary) (NE.singleton unlinked)
               pure (map snd warnings, linkable)
 
 demoteTypeErrorsToWarnings :: ParsedModule -> ParsedModule
